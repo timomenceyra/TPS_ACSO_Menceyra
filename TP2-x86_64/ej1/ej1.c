@@ -45,7 +45,12 @@ char* string_proc_list_concat(string_proc_list* list, uint8_t type , char* hash)
 		return NULL;
 	}
 
-	char* result = hash;
+	char* result = strdup(hash);
+
+	if(result == NULL){
+		return NULL;
+	}
+	
 	string_proc_node* current_node = list->first;
 	
 	while(current_node){
