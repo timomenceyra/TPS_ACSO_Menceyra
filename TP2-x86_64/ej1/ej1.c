@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "ej1.h"
 
 string_proc_list* string_proc_list_create(void){
@@ -50,7 +53,7 @@ char* string_proc_list_concat(string_proc_list* list, uint8_t type , char* hash)
 	if(result == NULL){
 		return NULL;
 	}
-	
+
 	string_proc_node* current_node = list->first;
 	
 	while(current_node){
