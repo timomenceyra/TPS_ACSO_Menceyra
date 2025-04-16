@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ej1.h"
+char* strdup(const char* s);  // Declaración explícita para evitar warning en C99
 
 string_proc_list* string_proc_list_create(void){
 	string_proc_list* list = (string_proc_list*)malloc(sizeof(string_proc_list));
@@ -119,4 +120,3 @@ void string_proc_list_print(string_proc_list* list, FILE* file){
                 current_node = current_node->next;
         }
 }
-
