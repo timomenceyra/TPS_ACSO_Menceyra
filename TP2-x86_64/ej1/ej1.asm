@@ -25,7 +25,7 @@ string_proc_list_create_asm:
 
 
     test rax, rax            ; ¿es NULL?
-    je .ret_null             ; si sí, devolvemos NULL
+    je .malloc_failed             ; si sí, devolvemos NULL
 
     ; Inicializamos los campos: list->first = NULL; list->last = NULL
     mov QWORD [rax], 0       ; first
@@ -50,7 +50,7 @@ string_proc_node_create_asm:
     pop rdi                  ; recuperamos type
 
     test rax, rax            ; ¿es NULL?
-    je .ret_null             ; si sí, devolvemos NULL
+    je .malloc_failed             ; si sí, devolvemos NULL
 
     ; Inicializamos los campos: node->next = NULL; node->prev = NULL; node->type = type; node->hash = hash
     mov QWORD [rax], 0       ; next
