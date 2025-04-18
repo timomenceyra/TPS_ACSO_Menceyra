@@ -19,137 +19,124 @@ extern str_concat
 
 
 string_proc_list_create_asm:
-    ; Llamamos a malloc(sizeof(string_proc_list)) = malloc(16)
-    mov rdi, 16              ; tamaño del struct
-    call malloc              ; devuelve puntero en rax
+    ; Reserva memoria para una lista vacía y la inicializa con NULLs
+    mov rdi, 16
+    call malloc
 
+    test rax, rax               ; Verifica si rax es NULL
+    je .malloc_failed           ; Si es NULL, salta a la etiqueta de fallo
 
-    test rax, rax            ; ¿es NULL?
-    je .malloc_failed             ; si sí, devolvemos NULL
+    ; Inicializa la lista
+    mov QWORD [rax], 0          ; Inicializa el primer puntero a NULL
+    mov QWORD [rax + 8], 0      ; Inicializa el segundo puntero a NULL
 
-    ; Inicializamos los campos: list->first = NULL; list->last = NULL
-    mov QWORD [rax], 0       ; first
-    mov QWORD [rax + 8], 0   ; last
-
-    ; Devolvemos el puntero a la lista
     ret
 
 .malloc_failed:
-    ; Manejo de error de malloc
-    xor rax, rax             ; si malloc falla, devolvemos NULL
+    xor rax, rax                ; Asigna NULL a rax
     ret
 
 string_proc_node_create_asm:
-    ; Argumentos: rdi = type (uint8_t), rsi = hash (char*)
-    ; Llamamos a malloc(sizeof(string_proc_node)) = malloc(32)
-    push rdi                 ; guardamos type
-    push rsi                 ; guardamos hash
-    mov rdi, 32              ; tamaño del struct
-    call malloc              ; devuelve puntero en rax
-    pop rsi                  ; recuperamos hash
-    pop rdi                  ; recuperamos type
+    ; Reserva memoria para un nodo de cadena y lo inicializa
+    push rdi                        ; Guarda el tipo
+    push rsi                        ; Guarda el hash
+    mov rdi, 32                     ; Tamaño del nodo
+    call malloc
+    pop rsi                         ; Restaura el hash
+    pop rdi                         ; Restaura el tipo
 
-    test rax, rax            ; ¿es NULL?
-    je .malloc_failed             ; si sí, devolvemos NULL
+    test rax, rax                   ; Verifica si rax es NULL
+    je .malloc_failed               ; Si es NULL, salta a la etiqueta de fallo
 
-    ; Inicializamos los campos: node->next = NULL; node->prev = NULL; node->type = type; node->hash = hash
-    mov QWORD [rax], 0       ; next
-    mov QWORD [rax + 8], 0   ; prev
-    mov BYTE [rax + 16], dil ; type
-    mov QWORD [rax + 24], rsi; hash
+    mov QWORD [rax], 0              ; Inicializa el puntero siguiente a NULL
+    mov QWORD [rax + 8], 0          ; Inicializa el puntero anterior a NULL
+    mov BYTE [rax + 16], dil        ; Almacena el tipo
+    mov QWORD [rax + 24], rsi       ; Almacena el hash
 
-    ; Devolvemos el puntero al nodo
     ret
 
 .malloc_failed:
-    ; Manejo de error de malloc
-    xor rax, rax             ; si malloc falla, devolvemos NULL
+    xor rax, rax                    ; Asigna NULL a rax
     ret
 
 string_proc_list_add_node_asm:
-    ; Argumentos: rdi = list, rsi = type (uint8_t), rdx = hash (char*)
+    ; Agrega un nodo a la lista de cadenas
+    push rdi                            ; Guarda el puntero de la lista
+    mov rdi, rsi                        ; Mueve el tipo al registro rdi
+    mov rsi, rdx                        ; Mueve el hash al registro rsi
+    call string_proc_node_create_asm    ; Crea un nuevo nodo
+    pop rdi                             ; Restaura el puntero de la lista
 
-    ; Llamamos a string_proc_node_create_asm(type, hash)
-    push rdi             ; guardamos list
-    mov rdi, rsi         ; pasamos type
-    mov rsi, rdx         ; pasamos hash
-    call string_proc_node_create_asm
-    pop rdi              ; recuperamos list
+    test rax, rax                       ; Verifica si rax es NULL
+    je .return                          ; Si es NULL, salta a la etiqueta de retorno
 
-    test rax, rax        ; ¿es NULL?
-    je .return           ; si sí, devolvemos NULL
-
-
-    mov r8, rax        ; guardamos el nuevo nodo en r8
-    mov r9, [rdi]      ; r9 = list->first
-    test r9, r9        ; ¿list->first == NULL?
-    jz .empty_list     ; si sí, vamos a la lista vacía
+    mov r8, rax                         ; Carga el nuevo nodo en r8
+    mov r9, [rdi]                       ; Carga el puntero al primer nodo
+    test r9, r9                         ; Verifica si r9 es NULL
+    jz .empty_list                      ; Si está vacía, salta a la lógica de lista vacía
 
     ; Caso lista no vacía
-    mov r10, [rdi + 8] ; r10 = list->last
-    mov [r8 + 8], r10  ; new_node->prev = list->last
-    mov [r10], r8      ; list->last->next = new_node
-    mov [rdi + 8], r8  ; list->last = new_node
+    mov r10, [rdi + 8]                  ; Carga el puntero al último nodo
+    mov [r8 + 8], r10                   ; Establece el siguiente nodo del nuevo nodo
+    mov [r10], r8                       ; Establece el nuevo nodo como el anterior del siguiente
+    mov [rdi + 8], r8                   ; Actualiza el puntero de la lista al nuevo nodo
     jmp .return
 
 .empty_list:
-    ; Caso lista vacía
-    mov [rdi], r8      ; list->first = new_node
-    mov [rdi + 8], r8  ; list->last = new_node
+    ; Manejo de caso de lista vacía
+    mov [rdi], r8                       ; Establece el primer nodo de la lista
+    mov [rdi + 8], r8                   ; Establece el puntero de siguiente del primer nodo
 
 .return:
     ret
 
 string_proc_list_concat_asm:
-    ; Argumentos: rdi = list, rsi, type (uint8_t), rdx = hash (char*)
-
-    mov r8, rdx       ; guardamos el hash en r8
-    mov r9, [rdi]     ; r9 = list->first
-    mov r10, rsi      ; r10 = type
-    mov r11, rdx      ; r11 = hash original
+    ; Concatena dos listas de cadenas
+    mov r8, rdx                         
+    mov r9, [rdi]
+    mov r10, rsi                ; Guarda el tipo enn r10
+    mov r11, rdx                ; Guarda el hash original en r11
 
 .loop:
-    test r9, r9       ; ¿current == NULL?
-    je .done          ; si sí, terminamos
+    test r9, r9                 ; Verifica si se ha llegado al final de la lista
+    je .done                    ; Si es así, salta a la etiqueta de fin
 
-    movzx rax, byte [r9 + 16] ; rax = current->type
-    cmp rax, r10      ; comparamos con el tipo
-    jne .next         ; si no son iguales, vamos al siguiente nodo
+    movzx rax, byte [r9 + 16]   ; Carga el tipo del nodo actual
+    cmp rax, r10                ; Compara los tipos
+    jne .next                   ; Si no son iguales, salta al siguiente nodo
 
-    ; Concatenamos el hash
-    mov rdi, r8       ; rdi = hash
-    mov rsi, [r9 + 24] ; rsi = current->hash
-    push r8
-    push r9
-    push r10
-    push r11
-    call str_concat
-    pop r11
-    pop r10
-    pop r9
-    pop r8
+    mov rdi, r8
+    mov rsi, [r9 + 24]
+    push r8                     ; Guarda el puntero de la lista de destino
+    push r9                     ; Guarda el puntero del nodo actual
+    push r10                    ; Guarda el valor a comparar
+    push r11                    ; Guarda el puntero de la lista de destino
+    call str_concat             ; Llama a la función de concatenación
+    pop r11                     ; Restaura el puntero de la lista de destino
+    pop r10                     ; Restaura el valor a comparar
+    pop r9                      ; Restaura el puntero del nodo actual
+    pop r8                      ; Restaura el puntero de la lista de destino
 
-    cmp r8, r11       ; comparamos el nuevo hash con el original
-    je .skip_free     ; si son iguales, no liberamos
-    mov rdi, r8       ; rdi = nuevo hash
-    push rax
-    push r9
-    push r10
-    push r11
-    call free         ; liberamos el hash anterior
-    pop r11
-    pop r10
-    pop r9
-    pop rax           ; recuperamos el nuevo hash
+    cmp r8, r11                 ; Compara el resultado de la concatenación
+    je .skip_free               ; Si son iguales, salta a la etiqueta de omitir liberación
+    mov rdi, r8
+    push rax                    ; Guarda el resultado de la concatenación
+    push r9                     ; Guarda el puntero del nodo actual
+    push r10                    ; Guarda el tipo
+    push r11                    ; Guarda el hash original
+    call free                   ; Libera la memoria del resultado anterior
+    pop r11                     ; Restaura el hash original
+    pop r10                     ; Restaura el tipo
+    pop r9                      ; Restaura el puntero del nodo actual
+    pop rax                     ; Restaura el resultado de la concatenación
 
 .skip_free:
-    mov r8, rax       ; guardamos el nuevo hash en r8
+    mov r8, rax                 ; Actualiza r8 con el nuevo puntero de la cadena concatenada
 
 .next:
-    mov r9, [r9]      ; r9 = current->next
-    jmp .loop         ; volvemos al inicio del bucle
+    mov r9, [r9]                ; Avanza al siguiente nodo en la lista origen
+    jmp .loop
 
 .done:
-    ; Devolvemos el hash concatenado
-    mov rax, r8
+    mov rax, r8                 ; Retorna el puntero a la lista concatenada
     ret
