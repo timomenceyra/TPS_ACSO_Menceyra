@@ -3,20 +3,27 @@ Apellido: Menceyra
 mail: tmenceyra@udesa.edu.ar
 
 Fase 1:
-La fase 1 esperaba como input un string y fue simplemente mirar el valor del registro eax ya que el input ingresado se compara con ese valor y en caso de no ser iguales explota la bomba.
+La fase 1 esperaba como input un string y lo comparaba con el valor del registro eax. Si el string no coincidía con el valor del registro, la bomba explotaba. Lo que hice para resolverlo fue poner un breakpoint antes de la comparación y ver qué valor tenía el registro eax.
 Así descifré la clave "La ingratitud es hija de la soberbia.".
 
 Fase 2:
-La fase 2 esperaba como input dos números enteros. Lo que pedía la fase era que la multiplicación sea distinta de 0 (es decir que ninguno sea 0), que la suma de los dos dé como resultado 14361 y que uno fuera negativo y el otro positivo (es decir, que tuvieran signos opuestos), porque la función misterio explotaba si el XOR entre ellos daba un valor no negativo.
+La fase 2 esperaba como input dos números enteros.
+Lo que pedía la fase era que la multiplicación sea distinta de 0 (es decir que ninguno sea 0), que la suma de los dos dé como resultado 14361 y que uno fuera negativo y el otro positivo (es decir, que tuvieran signos opuestos), porque la función misterio explotaba si el XOR entre ellos daba un valor no negativo.
 Así descifré la clave "-1 14362".
 
 Fase 3:
-La fase 3 esperaba como input una palabra y un número entero (de no ser así explotaba la bomba).
+La fase 3 esperaba como input una palabra y un número entero.
 A la palabra ingresada se la aplicaba una función cuenta que verdaderamente no entendí que hacía pero me di cuenta que guardaba el resultado en el registro eax y luego lo comparaba con el número  de mi input. Entonces lo que hice fue ingresar una palabra y un número aleatorio (dado que no lo iba a usar), poner un breakpoint previo a la comparación e imprimí el valor del registro eax, consiguiendo así el número que debía acompañar a la palabra que yo había ingresado.
 También viendo el main me di cuenta que luego de la llamada a cada fase llamaba a una función phase_defused, y mirando phase_defused vi que se abría secret_phase si una tercera palabra en el input coincidia con el valor del registro rsi. Imprimí el valor del registro y decía "abrete_sesamo", por lo que agregué eso al final de mi clave para la fase 3.
 Así descifré la clave "enfierecerse 64081 abrete_sesamo".
 
 Fase 4:
-La fase 4 esperaba como input un string de exactamente 6 caracteres (sino explotada la bomba). Luego a ese string lo recorría caracter por caracter, se guardaba los últimos 4 bits del caracter aplicando AND 0xf (1111 en binario) y se guardaba ese valor como un índice.
-Luego evaluaba un array en ese índice y veía el valor, sumaba ese valor a un acumulador y al final lo comparaba con el valor 0x34 (52 en decimal). Imprimí el array y busqué qué índices correspondían con el valor 2 y el valor 10. Estos eran el 0 y el 5 respectivamente. Armé una función en python que le aplicaba el AND 0xf a todas las letras del abecedario y me fijé cuáles generaban esos índices (p->0, e->5).
+La fase 4 esperaba como input un string de exactamente 6 caracteres.
+Luego a ese string lo recorría caracter por caracter, se guardaba los últimos 4 bits del caracter aplicando AND 0xf (1111 en binario) y se guardaba ese valor como un índice.
+Utilizando ese índice evaluaba en un array y veía el valor, sumaba ese valor a un acumulador y al terminar de recorrer todo el string lo comparaba con el valor 0x34 (52 en decimal). Imprimí el array y busqué qué índices correspondían con el valor 2 y el valor 10. Estos eran el 0 y el 5 respectivamente. Armé una función en python que le aplicaba el AND 0xf a todas las letras del abecedario y me fijé cuáles generaban esos índices (p->0, e->5).
 Así descifré la clave "peeeee".
+
+Fase secreta:
+La fase secreta esperaba como input un número entero menor a 1000.
+Luego a este número se le aplicaba una función llamada fun7 y esta función debia devolver 0, sino explotaba la bomba. Al revisar fun7 comparaba mi número con el valor del registro rdi y si eran iguales devolvía 0. Entonces puse un breakpoint luego de la comparación e imprimí el valor dentro del registro rdi.
+Así descifré la clave "36".
