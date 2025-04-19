@@ -25,5 +25,5 @@ Así descifré la clave "peeeee".
 
 Fase secreta:
 La fase secreta esperaba como input un número entero menor a 1000.
-Luego a este número se le aplicaba una función llamada fun7 y esta función debia devolver 0, sino explotaba la bomba. Al revisar fun7 comparaba mi número con el valor del registro rdi y si eran iguales devolvía 0. Entonces puse un breakpoint luego de la comparación e imprimí el valor dentro del registro rdi.
+Luego a este número se le aplicaba una función llamada fun7 y esta función debia devolver 0, sino explotaba la bomba. Al revisar fun7 comparaba mi número con el valor del registro rdi y si eran iguales devolvía 0. Entonces puse un breakpoint luego de la comparación e imprimí el valor dentro del registro rdi. No miré el resto de la función.
 Así descifré la clave "36".
