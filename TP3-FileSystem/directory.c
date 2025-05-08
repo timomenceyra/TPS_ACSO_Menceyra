@@ -2,7 +2,7 @@
 #include "inode.h"
 #include "diskimg.h"
 #include "file.h"
-#include <direntv6.h>
+#include "direntv6.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
