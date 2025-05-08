@@ -4,6 +4,8 @@
 #include "inode.h"
 #include "diskimg.h"
 #include "unixfilesystem.h"
+#include "ino.h"
+
 #define INODES_PER_SECTOR (DISKIMG_SECTOR_SIZE / sizeof(struct inode))
 
 /**
@@ -19,7 +21,7 @@ int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp) {
 
     struct inode inodes[INODES_PER_SECTOR];
 
-    int bytes = diskimg_readsector(fs->dfd, inodes, sector);
+    int bytes = diskimg_readsector(fs->dfd, sector, inodes);
     if (bytes != DISKIMG_SECTOR_SIZE) {
         return -1; // error leyendo el sector
     }
@@ -32,10 +34,29 @@ int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp) {
 /**
  * TODO
  */
-int inode_indexlookup(struct unixfilesystem *fs, struct inode *inp,
-    int blockNum) {  
-        //Implement code here
-    return 0;
+int inode_indexlookup(struct unixfilesystem *fs, struct inode *in, int fileBlockIndex) {
+    (void) fs; // no lo usamos en el caso simple
+
+    if (fileBlockIndex < 0) {
+        return -1;
+    }
+
+    // Si el archivo no es grande (ILARG no seteado)
+    if ((in->i_mode & ILARG) == 0) {
+        if (fileBlockIndex >= 8) {
+            return -1;
+        }
+
+        int sector = in->i_addr[fileBlockIndex];
+        if (sector == 0) {
+            return -1; // bloque no asignado
+        }
+
+        return sector;
+    }
+
+    // TODO: manejar archivos grandes (con bloques indirectos)
+    return -1;
 }
 
 int inode_getsize(struct inode *inp) {
