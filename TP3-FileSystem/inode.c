@@ -55,7 +55,28 @@ int inode_indexlookup(struct unixfilesystem *fs, struct inode *in, int fileBlock
         return sector;
     }
 
-    // TODO: manejar archivos grandes (con bloques indirectos)
+        // Archivos grandes: usar bloques indirectos
+    int indirect_block_limit = 7 * (DISKIMG_SECTOR_SIZE / sizeof(uint16_t));
+
+    if (fileBlockIndex < indirect_block_limit) {
+        int indirect_block_index = fileBlockIndex / (DISKIMG_SECTOR_SIZE / sizeof(uint16_t));
+        int index_within_block = fileBlockIndex % (DISKIMG_SECTOR_SIZE / sizeof(uint16_t));
+
+        uint16_t indirect_block[DISKIMG_SECTOR_SIZE / sizeof(uint16_t)];
+
+        int sector = in->i_addr[indirect_block_index];
+        if (sector == 0) return -1;
+
+        int bytes = diskimg_readsector(fs->dfd, sector, indirect_block);
+        if (bytes != DISKIMG_SECTOR_SIZE) return -1;
+
+        int data_sector = indirect_block[index_within_block];
+        if (data_sector == 0) return -1;
+
+        return data_sector;
+    }
+
+    // No manejamos doble indirección aún
     return -1;
 }
 
