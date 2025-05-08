@@ -55,7 +55,7 @@ int inode_indexlookup(struct unixfilesystem *fs, struct inode *in, int fileBlock
         return sector;
     }
 
-        // Archivos grandes: usar bloques indirectos
+    // Archivos grandes: usar bloques indirectos
     int indirect_block_limit = 7 * (DISKIMG_SECTOR_SIZE / sizeof(uint16_t));
 
     if (fileBlockIndex < indirect_block_limit) {
@@ -76,7 +76,37 @@ int inode_indexlookup(struct unixfilesystem *fs, struct inode *in, int fileBlock
         return data_sector;
     }
 
-    // No manejamos doble indirección aún
+    // Doble indirección: i_addr[7]
+    int single_indirect_capacity = DISKIMG_SECTOR_SIZE / sizeof(uint16_t); // 256
+    int double_indirect_start = 7 * single_indirect_capacity;
+
+    if (fileBlockIndex < double_indirect_start + single_indirect_capacity * single_indirect_capacity) {
+        int relative_index = fileBlockIndex - double_indirect_start;
+        int first_level_index = relative_index / single_indirect_capacity;
+        int second_level_index = relative_index % single_indirect_capacity;
+
+        uint16_t first_level_block[single_indirect_capacity];
+        uint16_t second_level_block[single_indirect_capacity];
+
+        int first_sector = in->i_addr[7];
+        if (first_sector == 0) return -1;
+
+        int bytes = diskimg_readsector(fs->dfd, first_sector, first_level_block);
+        if (bytes != DISKIMG_SECTOR_SIZE) return -1;
+
+        int second_sector = first_level_block[first_level_index];
+        if (second_sector == 0) return -1;
+
+        bytes = diskimg_readsector(fs->dfd, second_sector, second_level_block);
+        if (bytes != DISKIMG_SECTOR_SIZE) return -1;
+
+        int data_sector = second_level_block[second_level_index];
+        if (data_sector == 0) return -1;
+
+        return data_sector;
+    }
+
+    // No manejamos triple indirección aún
     return -1;
 }
 
