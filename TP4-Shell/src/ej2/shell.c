@@ -40,143 +40,145 @@ int main() {
            In each iteration of the while loop, strtok() returns the next token found in command. 
            The tokens are stored in the commands[] array, and command_count is incremented to keep track of the number of tokens found. */
 
-           int command_count = 0;
-           char *token = strtok(command, "|");
+        int command_count = 0;
+        char *token = strtok(command, "|");
 
-           while (token != NULL && command_count < MAX_COMMANDS) {
-               commands[command_count++] = token;
-               token = strtok(NULL, "|");
-           }
+        while (token != NULL && command_count < MAX_COMMANDS) {
+            commands[command_count++] = token;
+            token = strtok(NULL, "|");
+        }
 
-           int pipes[2 * (command_count - 1)];
-           for (int i = 0; i < command_count - 1; i++) {
-               if (pipe(pipes + i * 2) < 0) {
-                   perror("pipe");
-                   exit(EXIT_FAILURE);
-               }
+        int pipes[2 * (command_count - 1)];
+        for (int i = 0; i < command_count - 1; i++) {
+            if (pipe(pipes + i * 2) < 0) {
+                perror("pipe");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        for (int i = 0; i < command_count; i++) {
+            // Verificar si el comando es válido
+            // while (commands[i][0] == ' ') commands[i]++;
+
+            // Trim completo: borrar espacios iniciales y finales
+            while (commands[i][0] == ' ') commands[i]++;  // inicio
+            char *end = commands[i] + strlen(commands[i]) - 1;
+            while (end > commands[i] && *end == ' ') {
+                *end = '\0';
+                end--;
             }
 
-            for (int i = 0; i < command_count; i++) {
-                // Verificar si el comando es válido
-                // while (commands[i][0] == ' ') commands[i]++;
+            if (strlen(commands[i]) == 0) {
+                fprintf(stderr, "Error: Comando vacío\n");
+                exit(EXIT_FAILURE);
+            }
 
-                // Trim completo: borrar espacios iniciales y finales
-                while (commands[i][0] == ' ') commands[i]++;  // inicio
-                char *end = commands[i] + strlen(commands[i]) - 1;
-                while (end > commands[i] && *end == ' ') {
-                    *end = '\0';
-                    end--;
+            pid_t pid = fork();
+            if (pid < 0) {
+                perror("fork");
+                exit(EXIT_FAILURE);
+
+            } else if (pid == 0) { // Proceso hijo
+                if (i > 0) { // No es el primer comando
+                    dup2(pipes[(i - 1) * 2], STDIN_FILENO);
                 }
 
-                if (strlen(commands[i]) == 0) {
-                    fprintf(stderr, "Error: Comando vacío\n");
-                    exit(EXIT_FAILURE);
+                if (i < command_count - 1) { // No es el último comando
+                    dup2(pipes[i * 2 + 1], STDOUT_FILENO);
                 }
 
-                pid_t pid = fork();
-                if (pid < 0) {
-                    perror("fork");
-                    exit(EXIT_FAILURE);
+                // Cerrar todos los pipes en el proceso hijo
+                for (int j = 0; j < 2 * (command_count - 1); j++) {
+                    close(pipes[j]);
+                }
 
-                } else if (pid == 0) { // Proceso hijo
-                    if (i > 0) { // No es el primer comando
-                        dup2(pipes[(i - 1) * 2], STDIN_FILENO);
-                    }
+                // // Tokenizar el comando actual
+                // char *args[MAX_ARGS];
+                // int arg_count = 0;
+                // char *arg_token = strtok(commands[i], " ");
 
-                    if (i < command_count - 1) { // No es el último comando
-                        dup2(pipes[i * 2 + 1], STDOUT_FILENO);
-                    }
+                // while (arg_token && arg_count < MAX_ARGS - 1) {
+                //     args[arg_count++] = arg_token;
+                //     arg_token = strtok(NULL, " ");
+                // }
+                // args[arg_count] = NULL;
 
-                    // Cerrar todos los pipes en el proceso hijo
-                    for (int j = 0; j < 2 * (command_count - 1); j++) {
-                        close(pipes[j]);
-                    }
+                char *args[MAX_ARGS];
+                int arg_count = 0;
+                char *p = commands[i];
 
-                    // // Tokenizar el comando actual
-                    // char *args[MAX_ARGS];
-                    // int arg_count = 0;
-                    // char *arg_token = strtok(commands[i], " ");
+                while (*p) {
+                    // Saltar espacios iniciales
+                    while (*p == ' ') p++;
 
-                    // while (arg_token && arg_count < MAX_ARGS - 1) {
-                    //     args[arg_count++] = arg_token;
-                    //     arg_token = strtok(NULL, " ");
-                    // }
-                    // args[arg_count] = NULL;
+                    if (*p == '\0') break;
 
-                    char *args[MAX_ARGS];
-                    int arg_count = 0;
-                    char *p = commands[i];
-
-                    while (*p) {
-                        // Saltar espacios iniciales
-                        while (*p == ' ') p++;
-
-                        if (*p == '\0') break;
+                    if (*p == '"') {
+                        // Si empieza con comillas
+                        p++;  // saltear la primera comilla
+                        char *start = p;
+                        while (*p && *p != '"') p++;
 
                         if (*p == '"') {
-                            // Si empieza con comillas
-                            p++;  // saltear la primera comilla
-                            char *start = p;
-                            while (*p && *p != '"') p++;
-
-                            if (*p == '"') {
-                                *p = '\0';
-                                if (arg_count >= MAX_ARGS - 1) {
-                                    fprintf(stderr, "Error: demasiados argumentos\n");
-                                    exit(EXIT_FAILURE);
-                                }
-                                args[arg_count++] = start;
-                                p++;  // saltear la comilla final
-                                while (*p == ' ') p++;  // saltar espacios después de la comilla
-                            } else {
-                                // Comilla sin cerrar, tomar hasta el final
-                                if (arg_count >= MAX_ARGS - 1) {
-                                    fprintf(stderr, "Error: demasiados argumentos\n");
-                                    exit(EXIT_FAILURE);
-                                }
-                                args[arg_count++] = start;
-                                break;
+                            *p = '\0';
+                            if (arg_count >= MAX_ARGS - 1) {
+                                fprintf(stderr, "Error: demasiados argumentos\n");
+                                exit(EXIT_FAILURE);
                             }
+                            args[arg_count++] = start;
+                            p++;  // saltear la comilla final
+                            while (*p == ' ') p++;  // saltar espacios después de la comilla
                         } else {
-                            // Si no tiene comillas
-                            char *start = p;
-                            while (*p && *p != ' ') p++;
-
-                            if (*p) {
-                                *p = '\0';
-                                if (arg_count >= MAX_ARGS - 1) {
-                                    fprintf(stderr, "Error: demasiados argumentos\n");
-                                    exit(EXIT_FAILURE);
-                                }
-                                args[arg_count++] = start;
-                                p++;  // avanzar para el próximo token
-                            } else {
-                                if (arg_count >= MAX_ARGS - 1) {
-                                    fprintf(stderr, "Error: demasiados argumentos\n");
-                                    exit(EXIT_FAILURE);
-                                }
-                                args[arg_count++] = start;
-                                break;
+                            // Comilla sin cerrar, tomar hasta el final
+                            if (arg_count >= MAX_ARGS - 1) {
+                                fprintf(stderr, "Error: demasiados argumentos\n");
+                                exit(EXIT_FAILURE);
                             }
+                            args[arg_count++] = start;
+                            break;
+                        }
+                    } else {
+                        // Si no tiene comillas
+                        char *start = p;
+                        while (*p && *p != ' ') p++;
+
+                        if (*p) {
+                            *p = '\0';
+                            if (arg_count >= MAX_ARGS - 1) {
+                                fprintf(stderr, "Error: demasiados argumentos\n");
+                                exit(EXIT_FAILURE);
+                            }
+                            args[arg_count++] = start;
+                            p++;  // avanzar para el próximo token
+                        } else {
+                            if (arg_count >= MAX_ARGS - 1) {
+                                fprintf(stderr, "Error: demasiados argumentos\n");
+                                exit(EXIT_FAILURE);
+                            }
+                            args[arg_count++] = start;
+                            break;
                         }
                     }
-                    args[arg_count] = NULL;
-
-                    execvp(args[0], args);
-                    perror("execvp");
-                    exit(EXIT_FAILURE);
                 }
-            }
+                args[arg_count] = NULL;
 
-            // Cerrar todos los pipes en el proceso padre
-            for (int i = 0; i < 2 * (command_count - 1); i++) {
-                close(pipes[i]);
+                execvp(args[0], args);
+                perror("execvp");
+                fflush(stderr);
+                fflush(stdout);
+                exit(EXIT_FAILURE);
             }
+        }
 
-            // Esperar a que todos los procesos hijos terminen
-            for (int i = 0; i < command_count; i++) {
-                wait(NULL);
-            }
+        // Cerrar todos los pipes en el proceso padre
+        for (int i = 0; i < 2 * (command_count - 1); i++) {
+            close(pipes[i]);
+        }
+
+        // Esperar a que todos los procesos hijos terminen
+        for (int i = 0; i < command_count; i++) {
+            wait(NULL);
+        }
     }
     return 0;
 }
