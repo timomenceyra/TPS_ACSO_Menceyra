@@ -58,7 +58,16 @@ int main() {
 
             for (int i = 0; i < command_count; i++) {
                 // Verificar si el comando es válido
-                while (commands[i][0] == ' ') commands[i]++;
+                // while (commands[i][0] == ' ') commands[i]++;
+
+                // Trim completo: borrar espacios iniciales y finales
+                while (commands[i][0] == ' ') commands[i]++;  // inicio
+                char *end = commands[i] + strlen(commands[i]) - 1;
+                while (end > commands[i] && *end == ' ') {
+                    *end = '\0';
+                    end--;
+                }
+
                 if (strlen(commands[i]) == 0) {
                     fprintf(stderr, "Error: Comando vacío\n");
                     exit(EXIT_FAILURE);
@@ -83,58 +92,75 @@ int main() {
                         close(pipes[j]);
                     }
 
-                    // Tokenizar el comando actual
-                    char *args[MAX_ARGS];
-                    int arg_count = 0;
-                    char *arg_token = strtok(commands[i], " ");
-
-                    while (arg_token && arg_count < MAX_ARGS - 1) {
-                        args[arg_count++] = arg_token;
-                        arg_token = strtok(NULL, " ");
-                    }
-                    args[arg_count] = NULL;
-
+                    // // Tokenizar el comando actual
                     // char *args[MAX_ARGS];
                     // int arg_count = 0;
-                    // char *p = commands[i];
+                    // char *arg_token = strtok(commands[i], " ");
 
-                    // while (*p) {
-                    //     // Saltar espacios iniciales
-                    //     while (*p == ' ') p++;
-
-                    //     if (*p == '\0') break;
-
-                    //     if (*p == '"') {
-                    //         // Si empieza con comillas
-                    //         p++;  // saltear la primera comilla
-                    //         char *start = p;
-                    //         while (*p && *p != '"') p++;
-
-                    //         if (*p == '"') {
-                    //             *p = '\0';
-                    //             args[arg_count++] = start;
-                    //             p++;  // saltear la comilla final
-                    //         } else {
-                    //             // Comilla sin cerrar, tomar hasta el final
-                    //             args[arg_count++] = start;
-                    //             break;
-                    //         }
-                    //     } else {
-                    //         // Si no tiene comillas
-                    //         char *start = p;
-                    //         while (*p && *p != ' ') p++;
-
-                    //         if (*p) {
-                    //             *p = '\0';
-                    //             args[arg_count++] = start;
-                    //             p++;  // avanzar para el próximo token
-                    //         } else {
-                    //             args[arg_count++] = start;
-                    //             break;
-                    //         }
-                    //     }
+                    // while (arg_token && arg_count < MAX_ARGS - 1) {
+                    //     args[arg_count++] = arg_token;
+                    //     arg_token = strtok(NULL, " ");
                     // }
                     // args[arg_count] = NULL;
+
+                    char *args[MAX_ARGS];
+                    int arg_count = 0;
+                    char *p = commands[i];
+
+                    while (*p) {
+                        // Saltar espacios iniciales
+                        while (*p == ' ') p++;
+
+                        if (*p == '\0') break;
+
+                        if (*p == '"') {
+                            // Si empieza con comillas
+                            p++;  // saltear la primera comilla
+                            char *start = p;
+                            while (*p && *p != '"') p++;
+
+                            if (*p == '"') {
+                                *p = '\0';
+                                if (arg_count >= MAX_ARGS - 1) {
+                                    fprintf(stderr, "Error: demasiados argumentos\n");
+                                    exit(EXIT_FAILURE);
+                                }
+                                args[arg_count++] = start;
+                                p++;  // saltear la comilla final
+                                while (*p == ' ') p++;  // saltar espacios después de la comilla
+                            } else {
+                                // Comilla sin cerrar, tomar hasta el final
+                                if (arg_count >= MAX_ARGS - 1) {
+                                    fprintf(stderr, "Error: demasiados argumentos\n");
+                                    exit(EXIT_FAILURE);
+                                }
+                                args[arg_count++] = start;
+                                break;
+                            }
+                        } else {
+                            // Si no tiene comillas
+                            char *start = p;
+                            while (*p && *p != ' ') p++;
+
+                            if (*p) {
+                                *p = '\0';
+                                if (arg_count >= MAX_ARGS - 1) {
+                                    fprintf(stderr, "Error: demasiados argumentos\n");
+                                    exit(EXIT_FAILURE);
+                                }
+                                args[arg_count++] = start;
+                                p++;  // avanzar para el próximo token
+                            } else {
+                                if (arg_count >= MAX_ARGS - 1) {
+                                    fprintf(stderr, "Error: demasiados argumentos\n");
+                                    exit(EXIT_FAILURE);
+                                }
+                                args[arg_count++] = start;
+                                break;
+                            }
+                        }
+                    }
+                    args[arg_count] = NULL;
 
                     execvp(args[0], args);
                     perror("execvp");
