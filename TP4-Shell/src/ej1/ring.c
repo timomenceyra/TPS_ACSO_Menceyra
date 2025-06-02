@@ -33,17 +33,13 @@ int main(int argc, char **argv)
 	}
 
 	for (int i = 0; i < n; i++) {
-		printf("Creando proceso %d\n", i);
 		pid = fork();
 
 		if (pid == 0) {
-			printf("Soy el proceso hijo %d\n", i);
 
 			if (i == start) {
 				close(initial_pipe[1]);	// Cierro la escritura del pipe inicial
-				printf("El proceso %d espera lectura\n", i);
 				read(initial_pipe[0], buffer, sizeof(int));	// Leo el valor inicial del padre
-				printf("El proceso %d recibió el valor %d\n", i, buffer[0]);
 			} 
 			else {
 				close(pipes[(i + n - 1) % n][1]);	// Cierro la escritura del pipe del proceso anterior
@@ -69,8 +65,6 @@ int main(int argc, char **argv)
 
 	close(initial_pipe[0]);
 	write(initial_pipe[1], buffer, sizeof(int));	// Envío el valor inicial al primer proceso
-
-	printf("Proceso padre %d escribió en el proceso %d\n", buffer[0], start);
 	close(initial_pipe[1]);	// Cierro la escritura del pipe inicial
 
 	close(final_pipe[1]);	// Cierro la escritura del pipe final
