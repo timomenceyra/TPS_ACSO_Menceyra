@@ -35,8 +35,10 @@ int main(int argc, char **argv)
 	for (int i = 0; i < n; i++) {
 		printf("Creando proceso %d\n", i);
 		pid = fork();
+
 		if (pid == 0) {
 			printf("Soy el proceso hijo %d\n", i);
+
 			if (i == start) {
 				close(initial_pipe[1]);	// Cierro la escritura del pipe inicial
 				printf("El proceso %d espera lectura\n", i);
@@ -63,6 +65,7 @@ int main(int argc, char **argv)
 
 			exit(0);
 		}
+	}
 
 	close(initial_pipe[0]);
 	write(initial_pipe[1], buffer, sizeof(int));	// Envío el valor inicial al primer proceso
@@ -81,5 +84,4 @@ int main(int argc, char **argv)
 	}
 
 	return 0;
-	}
 }
