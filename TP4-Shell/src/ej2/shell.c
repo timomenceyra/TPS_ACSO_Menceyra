@@ -7,6 +7,71 @@
 #define MAX_COMMANDS 200
 #define MAX_ARGS 64
 
+int contar_argumentos(const char *comando) {
+    int count = 0;
+    int in_quotes = 0;
+
+    for (const char *p = comando; *p; ++p) {
+        if (*p == '"') {
+            in_quotes = !in_quotes;
+        } else if (!in_quotes && isspace(*p)) {
+            while (isspace(*p)) p++;
+            count++;
+        }
+    }
+    return count + 1;
+}
+
+int separar_comandos(char *command, char *commands[]) {
+    int command_count = 0;
+    int in_quotes = 0;
+    char *start = command;
+
+    for (char *p = command; ; ++p) {
+        if (*p == '"') in_quotes = !in_quotes;
+
+        // Pipe afuera de comillas o fin de línea
+        if ((*p == '|' && !in_quotes) || *p == '\0') {
+            size_t len = p - start;
+
+            while (len > 0 && isspace(start[0])) { start++; len--; } // Elimina espacios a izquierda
+            while (len > 0 && isspace(start[len - 1])) len--; // Elimina espacios a derecha
+
+            if (len == 0) {
+                fprintf(stderr, "Error: comando vacío\n");
+                for (int i = 0; i < command_count; i++) {
+                    free(commands[i]);
+                }
+                return -1;
+            }
+
+            commands[command_count] = malloc(len + 1);
+            if (!commands[command_count]) {
+                perror("malloc");
+                exit(1);
+            }
+
+            strncpy(commands[command_count], start, len);
+            commands[command_count][len] = '\0';
+
+            if (contar_argumentos(commands[command_count]) > MAX_ARGS) {
+                fprintf(stderr, "Error: se excedió la cantidad máxima de argumentos permitidos\n");
+                for (int i = 0; i <= command_count; i++) {
+                    free(commands[i]);
+                }
+                return -1;
+            }
+
+            command_count++;
+
+            if (*p == '\0') break; // Fin de línea
+
+            start = p + 1; // Avanza al siguiente comando
+        }
+    }
+    return command_count;
+}
+
 int main() {
     char command[256];
     char *commands[MAX_COMMANDS];
@@ -40,132 +105,53 @@ int main() {
            In each iteration of the while loop, strtok() returns the next token found in command. 
            The tokens are stored in the commands[] array, and command_count is incremented to keep track of the number of tokens found. */
 
-        int command_count = 0;
-        char *token = strtok(command, "|");
+        int command_count = separar_comandos(command, commands);
+        if (command_count < 0) continue;
 
-        while (token != NULL && command_count < MAX_COMMANDS) {
-            commands[command_count++] = token;
-            token = strtok(NULL, "|");
-        }
+        int pipes[MAX_COMMANDS][2];
+        pid_t pids[MAX_COMMANDS];
 
-        int pipes[2 * (command_count - 1)];
-        for (int i = 0; i < command_count - 1; i++) {
-            if (pipe(pipes + i * 2) < 0) {
+        for (int i = 0; i < command_count; i++) {
+            if (i < command_count - 1 && pipe(pipes[i]) < 0) {
                 perror("pipe");
-                exit(EXIT_FAILURE);
-            }
-        }
-
-        for (int i = 0; i < command_count; i++) {
-            // Verificar si el comando es válido
-            // while (commands[i][0] == ' ') commands[i]++;
-
-            // Trim completo: borrar espacios iniciales y finales
-            while (commands[i][0] == ' ') commands[i]++;  // inicio
-            char *end = commands[i] + strlen(commands[i]) - 1;
-            while (end > commands[i] && *end == ' ') {
-                *end = '\0';
-                end--;
+                exit(1);
             }
 
-            if (strlen(commands[i]) == 0) {
-                fprintf(stderr, "Error: Comando vacío\n");
-                exit(EXIT_FAILURE);
-            }
+            pids[i] = fork();
+            if (pids[i] == 0) {
+                if (i > 0) {
+                    dup2(pipes[i - 1][0], STDIN_FILENO);
+                }
 
-            pid_t pid = fork();
-            if (pid < 0) {
+                if (i < command_count - 1) {
+                    dup2(pipes[i][1], STDOUT_FILENO);
+                }
+
+                for (int j = 0; j < command_count - 1; j++) {
+                    close(pipes[j][0]);
+                    close(pipes[j][1]);
+                }
+
+                execlp("sh", "sh", "-c", commands[i], (char *)NULL);
+                perror("exec");
+                exit(1);
+            } else if (pids[i] < 0) {
                 perror("fork");
-                exit(EXIT_FAILURE);
-
-            } else if (pid == 0) { // Proceso hijo
-                if (i > 0) { // No es el primer comando
-                    dup2(pipes[(i - 1) * 2], STDIN_FILENO);
-                }
-
-                if (i < command_count - 1) { // No es el último comando
-                    dup2(pipes[i * 2 + 1], STDOUT_FILENO);
-                }
-
-                // Cerrar todos los pipes en el proceso hijo
-                for (int j = 0; j < 2 * (command_count - 1); j++) {
-                    close(pipes[j]);
-                }
-
-                // // Tokenizar el comando actual
-                // char *args[MAX_ARGS];
-                // int arg_count = 0;
-                // char *arg_token = strtok(commands[i], " ");
-
-                // while (arg_token && arg_count < MAX_ARGS - 1) {
-                //     args[arg_count++] = arg_token;
-                //     arg_token = strtok(NULL, " ");
-                // }
-                // args[arg_count] = NULL;
-                char *p = commands[i];
-                char *args[MAX_ARGS];
-                int arg_count = 0;
-
-                while (*p) {
-                    while (*p == ' ') p++;
-                    if (*p == '\0') break;
-
-                    if (*p == '"') {
-                        p++;
-                        char *start = p;
-                        while (*p && *p != '"') p++;
-                        if (*p == '"') {
-                            *p = '\0';
-                            if (arg_count >= MAX_ARGS - 1) {
-                                fprintf(stderr, "Error: demasiados argumentos\n");
-                                exit(EXIT_FAILURE);
-                            }
-                            args[arg_count++] = start;
-                            p++;
-                            while (*p == ' ') p++;
-                        } else {
-                            args[arg_count++] = start;
-                            break;
-                        }
-                    } else {
-                        char *start = p;
-                        while (*p && *p != ' ') p++;
-                        if (*p) {
-                            *p = '\0';
-                            if (arg_count >= MAX_ARGS - 1) {
-                                fprintf(stderr, "Error: demasiados argumentos\n");
-                                exit(EXIT_FAILURE);
-                            }
-                            args[arg_count++] = start;
-                            p++;
-                        } else {
-                            if (arg_count >= MAX_ARGS - 1) {
-                                fprintf(stderr, "Error: demasiados argumentos\n");
-                                exit(EXIT_FAILURE);
-                            }
-                            args[arg_count++] = start;
-                            break;
-                        }
-                    }
-                }
-                args[arg_count] = NULL;
-
-                execvp(args[0], args);
-                perror("execvp");
-                fflush(stderr);
-                fflush(stdout);
-                exit(EXIT_FAILURE);
+                exit(1);
             }
         }
 
-        // Cerrar todos los pipes en el proceso padre
-        for (int i = 0; i < 2 * (command_count - 1); i++) {
-            close(pipes[i]);
+        for (int i = 0; i < command_count - 1; i++) {
+            close(pipes[i][0]);
+            close(pipes[i][1]);
         }
 
-        // Esperar a que todos los procesos hijos terminen
         for (int i = 0; i < command_count; i++) {
-            wait(NULL);
+            waitpid(pids[i], NULL, 0);
+        }
+
+        for (int i = 0; i < command_count; i++) {
+            free(commands[i]);
         }
     }
     return 0;
