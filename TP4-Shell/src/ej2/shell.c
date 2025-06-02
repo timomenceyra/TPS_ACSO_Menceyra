@@ -57,6 +57,12 @@ int main() {
             }
 
             for (int i = 0; i < command_count; i++) {
+                // Verificar si el comando es válido
+                if (strlen(commands[i]) == 0) {
+                    fprintf(stderr, "Error: Comando vacío en la posición %d\n", i);
+                    exit(EXIT_FAILURE); // Saltar comandos vacíos
+                }
+
                 pid_t pid = fork();
                 if (pid < 0) {
                     perror("fork");
