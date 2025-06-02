@@ -63,6 +63,8 @@ int main(int argc, char **argv)
 	close(initial_pipe[0]);
 	write(initial_pipe[1], buffer, sizeof(int));	// Envío el valor inicial al primer proceso
 
+	printf("Proceso padre %d escribió en el proceso %d\n", buffer[0], start);
+
 	close(final_pipe[1]);	// Cierro la escritura del pipe final
 	int result;
 	read(final_pipe[0], &result, sizeof(int));	// Leo el resultado final del pipe
