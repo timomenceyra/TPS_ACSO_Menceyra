@@ -84,57 +84,57 @@ int main() {
                     }
 
                     // Tokenizar el comando actual
-                    // char *args[MAX_ARGS];
-                    // int arg_count = 0;
-                    // char *arg_token = strtok(commands[i], " ");
-
-                    // while (arg_token && arg_count < MAX_ARGS - 1) {
-                    //     args[arg_count++] = arg_token;
-                    //     arg_token = strtok(NULL, " ");
-                    // }
-                    // args[arg_count] = NULL;
-
                     char *args[MAX_ARGS];
                     int arg_count = 0;
-                    char *p = commands[i];
+                    char *arg_token = strtok(commands[i], " ");
 
-                    while (*p) {
-                        // Saltar espacios iniciales
-                        while (*p == ' ') p++;
-
-                        if (*p == '\0') break;
-
-                        if (*p == '"') {
-                            // Si empieza con comillas
-                            p++;  // saltear la primera comilla
-                            char *start = p;
-                            while (*p && *p != '"') p++;
-
-                            if (*p == '"') {
-                                *p = '\0';
-                                args[arg_count++] = start;
-                                p++;  // saltear la comilla final
-                            } else {
-                                // Comilla sin cerrar, tomar hasta el final
-                                args[arg_count++] = start;
-                                break;
-                            }
-                        } else {
-                            // Si no tiene comillas
-                            char *start = p;
-                            while (*p && *p != ' ') p++;
-
-                            if (*p) {
-                                *p = '\0';
-                                args[arg_count++] = start;
-                                p++;  // avanzar para el próximo token
-                            } else {
-                                args[arg_count++] = start;
-                                break;
-                            }
-                        }
+                    while (arg_token && arg_count < MAX_ARGS - 1) {
+                        args[arg_count++] = arg_token;
+                        arg_token = strtok(NULL, " ");
                     }
                     args[arg_count] = NULL;
+
+                    // char *args[MAX_ARGS];
+                    // int arg_count = 0;
+                    // char *p = commands[i];
+
+                    // while (*p) {
+                    //     // Saltar espacios iniciales
+                    //     while (*p == ' ') p++;
+
+                    //     if (*p == '\0') break;
+
+                    //     if (*p == '"') {
+                    //         // Si empieza con comillas
+                    //         p++;  // saltear la primera comilla
+                    //         char *start = p;
+                    //         while (*p && *p != '"') p++;
+
+                    //         if (*p == '"') {
+                    //             *p = '\0';
+                    //             args[arg_count++] = start;
+                    //             p++;  // saltear la comilla final
+                    //         } else {
+                    //             // Comilla sin cerrar, tomar hasta el final
+                    //             args[arg_count++] = start;
+                    //             break;
+                    //         }
+                    //     } else {
+                    //         // Si no tiene comillas
+                    //         char *start = p;
+                    //         while (*p && *p != ' ') p++;
+
+                    //         if (*p) {
+                    //             *p = '\0';
+                    //             args[arg_count++] = start;
+                    //             p++;  // avanzar para el próximo token
+                    //         } else {
+                    //             args[arg_count++] = start;
+                    //             break;
+                    //         }
+                    //     }
+                    // }
+                    // args[arg_count] = NULL;
 
                     execvp(args[0], args);
                     perror("execvp");
