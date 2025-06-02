@@ -8,6 +8,7 @@
 #define MAX_ARGS 64
 
 int contar_argumentos(const char *comando) {
+    // Cuenta los argumentos en un comando, considerando comillas
     int count = 0;
     int in_quotes = 0;
 
@@ -23,6 +24,7 @@ int contar_argumentos(const char *comando) {
 }
 
 int separar_comandos(char *command, char *commands[]) {
+    // Separa los comandos por pipe (|) y los almacena en commands
     int command_count = 0;
     int in_quotes = 0;
     char *start = command;
@@ -38,6 +40,7 @@ int separar_comandos(char *command, char *commands[]) {
             while (len > 0 && isspace(start[len - 1])) len--; // Elimina espacios a derecha
 
             if (len == 0) {
+                // Si el comando está vacío, error
                 fprintf(stderr, "Error: comando vacío\n");
                 for (int i = 0; i < command_count; i++) {
                     free(commands[i]);
@@ -54,6 +57,7 @@ int separar_comandos(char *command, char *commands[]) {
             strncpy(commands[command_count], start, len);
             commands[command_count][len] = '\0';
 
+            // Verifica si se excede el número máximo de argumentos
             if (contar_argumentos(commands[command_count]) > MAX_ARGS) {
                 fprintf(stderr, "Error: se excedió la cantidad máxima de argumentos permitidos\n");
                 for (int i = 0; i <= command_count; i++) {
@@ -105,13 +109,16 @@ int main() {
            In each iteration of the while loop, strtok() returns the next token found in command. 
            The tokens are stored in the commands[] array, and command_count is incremented to keep track of the number of tokens found. */
 
+        // Separa los comandos por pipe
         int command_count = separar_comandos(command, commands);
         if (command_count < 0) continue;
 
         int pipes[MAX_COMMANDS][2];
         pid_t pids[MAX_COMMANDS];
 
+        // Crea un proceso hijo por cada comando
         for (int i = 0; i < command_count; i++) {
+            // Crea un pipe para cada comando excepto el último
             if (i < command_count - 1 && pipe(pipes[i]) < 0) {
                 perror("pipe");
                 exit(1);
@@ -127,11 +134,13 @@ int main() {
                     dup2(pipes[i][1], STDOUT_FILENO);
                 }
 
+                // Cierra todos los pipes en el proceso hijo
                 for (int j = 0; j < command_count - 1; j++) {
                     close(pipes[j][0]);
                     close(pipes[j][1]);
                 }
 
+                // Ejecuta el comando
                 execlp("sh", "sh", "-c", commands[i], (char *)NULL);
                 perror("exec");
                 exit(1);
@@ -141,15 +150,18 @@ int main() {
             }
         }
 
+        // Cierra los pipes en el proceso padre
         for (int i = 0; i < command_count - 1; i++) {
             close(pipes[i][0]);
             close(pipes[i][1]);
         }
 
+        // Espera a que todos los procesos hijos terminen
         for (int i = 0; i < command_count; i++) {
             waitpid(pids[i], NULL, 0);
         }
 
+        // Libera la memoria de los comandos
         for (int i = 0; i < command_count; i++) {
             free(commands[i]);
         }
