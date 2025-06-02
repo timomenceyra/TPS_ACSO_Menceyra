@@ -58,15 +58,17 @@ int main() {
 
             for (int i = 0; i < command_count; i++) {
                 // Verificar si el comando es válido
+                while (commands[i][0] == ' ') commands[i]++;
                 if (strlen(commands[i]) == 0) {
-                    fprintf(stderr, "Error: Comando vacío en la posición %d\n", i);
-                    exit(EXIT_FAILURE); // Saltar comandos vacíos
+                    fprintf(stderr, "Error: Comando vacío\n");
+                    exit(EXIT_FAILURE);
                 }
 
                 pid_t pid = fork();
                 if (pid < 0) {
                     perror("fork");
                     exit(EXIT_FAILURE);
+
                 } else if (pid == 0) { // Proceso hijo
                     if (i > 0) { // No es el primer comando
                         dup2(pipes[(i - 1) * 2], STDIN_FILENO);
@@ -82,13 +84,55 @@ int main() {
                     }
 
                     // Tokenizar el comando actual
+                    // char *args[MAX_ARGS];
+                    // int arg_count = 0;
+                    // char *arg_token = strtok(commands[i], " ");
+
+                    // while (arg_token && arg_count < MAX_ARGS - 1) {
+                    //     args[arg_count++] = arg_token;
+                    //     arg_token = strtok(NULL, " ");
+                    // }
+                    // args[arg_count] = NULL;
+
                     char *args[MAX_ARGS];
                     int arg_count = 0;
-                    char *arg_token = strtok(commands[i], " ");
+                    char *p = commands[i];
 
-                    while (arg_token && arg_count < MAX_ARGS - 1) {
-                        args[arg_count++] = arg_token;
-                        arg_token = strtok(NULL, " ");
+                    while (*p) {
+                        // Saltar espacios iniciales
+                        while (*p == ' ') p++;
+
+                        if (*p == '\0') break;
+
+                        if (*p == '"') {
+                            // Si empieza con comillas
+                            p++;  // saltear la primera comilla
+                            char *start = p;
+                            while (*p && *p != '"') p++;
+
+                            if (*p == '"') {
+                                *p = '\0';
+                                args[arg_count++] = start;
+                                p++;  // saltear la comilla final
+                            } else {
+                                // Comilla sin cerrar, tomar hasta el final
+                                args[arg_count++] = start;
+                                break;
+                            }
+                        } else {
+                            // Si no tiene comillas
+                            char *start = p;
+                            while (*p && *p != ' ') p++;
+
+                            if (*p) {
+                                *p = '\0';
+                                args[arg_count++] = start;
+                                p++;  // avanzar para el próximo token
+                            } else {
+                                args[arg_count++] = start;
+                                break;
+                            }
+                        }
                     }
                     args[arg_count] = NULL;
 
