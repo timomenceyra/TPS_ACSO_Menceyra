@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 		if (pid == 0) {
 			if (i == start) {
 				close(initial_pipe[1]);	// Cierro la escritura del pipe inicial
-				printf("El proceso %d espera lectura");
+				printf("El proceso %d espera lectura\n", i);
 				read(initial_pipe[0], buffer, sizeof(int));	// Leo el valor inicial del padre
 				printf("El proceso %d recibió el valor %d\n", i, buffer[0]);
 			} 
