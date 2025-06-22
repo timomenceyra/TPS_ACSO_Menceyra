@@ -22,12 +22,12 @@ static void simpleTest() {
   for (size_t id = 0; id < kNumFunctions; id++) {
     pool.schedule([id] {
       oslock.lock();
-      cout << "Thread (ID: " << id << ") has started." << endl;
+      // cout << "Thread (ID: " << id << ") has started." << endl;
       oslock.unlock();
       size_t sleepTime = (id % 3) * 10;
       sleep_for(sleepTime);
       oslock.lock();
-      cout << "Thread (ID: " << id << ") has finished." << endl ;
+      // cout << "Thread (ID: " << id << ") has finished." << endl ;
       oslock.unlock();
     });
   }
