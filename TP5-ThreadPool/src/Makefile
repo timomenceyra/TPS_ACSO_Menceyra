@@ -15,3 +15,9 @@ clean:
 	rm -f $(TARGET) $(OBJ)
 
 .PHONY: all clean
+
+tptest:
+	$(CXX) $(CXXFLAGS) -o tptest tptest.cc thread-pool.cc Semaphore.cc
+
+tpcustomtest:
+	$(CXX) $(CXXFLAGS) -o tpcustomtest tpcustomtest.cc thread-pool.cc Semaphore.cc
