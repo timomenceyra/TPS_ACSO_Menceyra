@@ -34,6 +34,10 @@ typedef struct worker {
     /**
      * Complete the definition of the worker_t struct here...
      **/
+    bool available = true;  // Indicates if the worker is available for new tasks
+    bool hasTask = false; // Indicates if the worker has a task to execute
+    mutex mtx;  // Mutex to protect access to the worker's state
+    condition_variable cv;  // Condition variable to signal when a task is ready
 } worker_t;
 
 class ThreadPool {
@@ -78,6 +82,11 @@ class ThreadPool {
     /* It is incomplete, there should be more private variables to manage the structures... 
     * *
     */
+    queue<function<void(void)>> tasks;      // queue: tasks to be executed by workers
+    condition_variable dispatcher_cv;       // condition variable to signal dispatcher when tasks are available
+    mutex wait_mtx;                         // mutex to protect the wait condition
+    condition_variable wait_cv;             // condition variable to signal when all tasks are done
+    size_t activeTasks = 0;                 // counter for active tasks being processed by workers
   
     /* ThreadPools are the type of thing that shouldn't be cloneable, since it's
     * not clear what it means to clone a ThreadPool (should copies of all outstanding
