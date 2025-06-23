@@ -91,10 +91,6 @@ class ThreadPool {
     condition_variable_any wait_cv; // condition variable to signal when all tasks are done
     size_t activeTasks = 0; // counter for active tasks being processed by workers
     atomic<bool> thp_active{true}; // flag to indicate if the ThreadPool is alive
-    // Semaphore dispatcher_ready{0}; // semaphore to signal the dispatcher when tasks are available
-    // mutex wait_mtx;                         // mutex to protect the wait condition
-    // Semaphore wait_sem{0}; // semaphore to signal when all tasks are done
-    // size_t activeTasks = 0;                 // counter for active tasks being processed by workers
   
     /* ThreadPools are the type of thing that shouldn't be cloneable, since it's
     * not clear what it means to clone a ThreadPool (should copies of all outstanding
