@@ -39,7 +39,7 @@ typedef struct worker {
     bool available = true;  // Indicates if the worker is available for new tasks
     bool hasTask = false; // Indicates if the worker has a task to execute
     mutex mtx;  // Mutex to protect access to the worker's state
-    Semaphore ready = Semaphore(0); // Semaphore to signal when the worker is ready for a task
+    Semaphore ready{0}; // Semaphore to signal when the worker is ready for a task
 } worker_t;
 
 class ThreadPool {
@@ -85,9 +85,9 @@ class ThreadPool {
     * *
     */
     queue<function<void(void)>> tasks;      // queue: tasks to be executed by workers
-    Semaphore dispatcher_ready = Semaphore(0); // semaphore to signal the dispatcher when tasks are available
+    Semaphore dispatcher_ready{0}; // semaphore to signal the dispatcher when tasks are available
     mutex wait_mtx;                         // mutex to protect the wait condition
-    Semaphore wait_sem = Semaphore(0); // semaphore to signal when all tasks are done
+    Semaphore wait_sem{0}; // semaphore to signal when all tasks are done
     size_t activeTasks = 0;                 // counter for active tasks being processed by workers
   
     /* ThreadPools are the type of thing that shouldn't be cloneable, since it's
