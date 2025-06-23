@@ -36,8 +36,10 @@ void ThreadPool::dispatcher() {
     while(true) {
         dispatcher_ready.wait();                // Wait for a task to be available
 
-        if (done && tasks.empty()) { // If done and no tasks, exit
-            return;
+        {
+            unique_lock<mutex> lock(queueLock); // Lock the queue to safely check tasks
+            if (done && tasks.empty()) break;   // If done and no tasks, exit the loop
+            if (tasks.empty()) continue;        // If no tasks, continue waiting
         }
 
         function<void(void)> task;
@@ -74,9 +76,7 @@ void ThreadPool::worker(int id) {
     while (true) {
         worker.ready.wait();                         // Wait for a task to be ready
 
-        if (done && !worker.hasTask) {              // If done and no task, exit
-            return;
-        }
+        if (done && !worker.hasTask) break;          // If done and no task, exit the loop
 
         function<void(void)> task;
 
@@ -90,7 +90,7 @@ void ThreadPool::worker(int id) {
         task();                                      // Execute the task
 
         {
-            unique_lock<mutex> lock(worker.mtx);    // Lock the worker's mutex
+            unique_lock<mutex> lock(wait_mtx);    // Lock the worker's mutex
             activeTasks--;                        // Decrement the count of active tasks
             if (activeTasks == 0) {               // If no active tasks left
                 wait_sem.signal();                  // Notify the wait condition
