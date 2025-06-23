@@ -10,14 +10,11 @@ SRC = thread-pool.cc Semaphore.cc main.cc
 $(TARGET): $(SRC)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
+custom:
+	$(CXX) $(CXXFLAGS) -o $(TARGET) thread-pool.cc Semaphore.cc test_custom.cc
+
 # Clean up build artifacts
 clean:
 	rm -f $(TARGET) $(OBJ)
 
 .PHONY: all clean
-
-tptest:
-	$(CXX) $(CXXFLAGS) -o tptest tptest.cc thread-pool.cc Semaphore.cc
-
-tpcustomtest:
-	$(CXX) $(CXXFLAGS) -o tpcustomtest tpcustomtest.cc thread-pool.cc Semaphore.cc
