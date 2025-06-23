@@ -15,7 +15,7 @@
 #include <thread>      // for thread
 #include <vector>      // for vector
 #include <queue>       // for queue
-#include <mutex>       // for mutex
+#include <atomic>      // for atomic
 #include "Semaphore.h" // for Semaphore
 
 using namespace std;
@@ -36,8 +36,8 @@ typedef struct worker {
     /**
      * Complete the definition of the worker_t struct here...
      **/
-    bool available = true;  // Indicates if the worker is available for new tasks
-    bool hasTask = false; // Indicates if the worker has a task to execute
+    atomic<bool> available {true};  // Indicates if the worker is available for new tasks
+    // bool hasTask = false; // Indicates if the worker has a task to execute
     mutex mtx;  // Mutex to protect access to the worker's state
     Semaphore ready{0}; // Semaphore to signal when the worker is ready for a task
 } worker_t;
@@ -85,10 +85,16 @@ class ThreadPool {
     * *
     */
     queue<function<void(void)>> tasks;      // queue: tasks to be executed by workers
-    Semaphore dispatcher_ready{0}; // semaphore to signal the dispatcher when tasks are available
-    mutex wait_mtx;                         // mutex to protect the wait condition
-    Semaphore wait_sem{0}; // semaphore to signal when all tasks are done
-    size_t activeTasks = 0;                 // counter for active tasks being processed by workers
+    condition_variable_any task_ready; // condition variable to signal when tasks are available
+    mutex task_mtx; // mutex to protect the task queue
+    mutex wait_mtx; // mutex to protect the wait condition
+    condition_variable_any wait_cv; // condition variable to signal when all tasks are done
+    size_t activeTasks = 0; // counter for active tasks being processed by workers
+    atomic<bool> thp_active{true}; // flag to indicate if the ThreadPool is alive
+    // Semaphore dispatcher_ready{0}; // semaphore to signal the dispatcher when tasks are available
+    // mutex wait_mtx;                         // mutex to protect the wait condition
+    // Semaphore wait_sem{0}; // semaphore to signal when all tasks are done
+    // size_t activeTasks = 0;                 // counter for active tasks being processed by workers
   
     /* ThreadPools are the type of thing that shouldn't be cloneable, since it's
     * not clear what it means to clone a ThreadPool (should copies of all outstanding

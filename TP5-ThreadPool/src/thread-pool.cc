@@ -5,6 +5,7 @@
  */
 
 #include "thread-pool.h"
+#include <stdexcept>
 using namespace std;
 
 ThreadPool::ThreadPool(size_t numThreads) : wts(numThreads), done(false) {
@@ -20,51 +21,50 @@ ThreadPool::ThreadPool(size_t numThreads) : wts(numThreads), done(false) {
 }
 
 void ThreadPool::schedule(const function<void(void)>& thunk) {
+    if (!thp_active.load()) throw runtime_error("Cannot schedule on inactive ThreadPool"); // Check if the ThreadPool is active
+    if (!thunk) throw invalid_argument("Thunk cannot be null"); // Check if the thunk is valid
     {
-        unique_lock<mutex> lock(queueLock);         // Lock the queue to safely add a task
+        lock_guard<mutex> lock(task_mtx);         // Lock the task mutex to safely access the task queue
         tasks.push(thunk);                          // Add the task to the queue
         {
-            unique_lock<mutex> wait_lock(wait_mtx); // Lock the wait mutex
+            lock_guard<mutex> guard(wait_mtx); // Lock the wait mutex
             activeTasks++;                          // Increment the count of active tasks
         }                  
     }
 
-    dispatcher_ready.signal();                     // Notify the dispatcher that a new task is available
+    task_ready.notify_all();                  // Notify the dispatcher that a new task is available
 }
 
 void ThreadPool::dispatcher() {
-    while(true) {
-        dispatcher_ready.wait();                // Wait for a task to be available
-
-        {
-            unique_lock<mutex> lock(queueLock); // Lock the queue to safely check tasks
-            if (done && tasks.empty()) break;   // If done and no tasks, exit the loop
-            if (tasks.empty()) continue;        // If no tasks, continue waiting
-        }
-
+    while (true) {
         function<void(void)> task;
 
         {
-            unique_lock<mutex> lock(queueLock); // Lock the queue to safely access tasks
-            if (tasks.empty()) continue;         // If no tasks, continue waiting
-
-            task = move(tasks.front());          // Get the next task
-            tasks.pop();                          // Remove the task from the queue
+            unique_lock<mutex> lock(task_mtx); // Lock the task mutex
+            task_ready.wait(lock, [this]() {
+                return !tasks.empty() || done; // Wait until there are tasks or the pool is done
+            });
+            if (done && tasks.empty()) return; // If done and no tasks, exit the loop
+            task = tasks.front();         // Move the task from the queue
+            tasks.pop();                        // Remove the task from the queue
         }
 
-        bool taskAssigned = false;
-
+        bool taskAssigned = false; // Flag to check if the task was assigned
         while (!taskAssigned) {
-            for (worker_t& worker : wts) { // Iterate through workers
-                unique_lock<mutex> lock(worker.mtx); // Lock the worker's mutex
-                if (worker.available && !worker.hasTask) { // If worker is available and has no task
-                    worker.thunk = move(task); // Assign the task to the worker
-                    worker.hasTask = true;     // Mark the worker as having a task
-                    worker.available = false;  // Mark the worker as not available
-                    worker.ready.signal(); // Signal the worker that a task is ready
-                    taskAssigned = true;      // Mark the task as assigned
-                    break;                   // Exit the loop as the task is assigned
+            for (auto& worker : wts) {                // Iterate through workers
+                if (worker.available.load()) {         // Check if the worker is available
+                    worker.available.store(false);          // Mark the worker as not available
+                    {
+                        lock_guard<mutex> guard(worker.mtx); // Lock the worker's mutex
+                        worker.thunk = move(task);     // Assign the task to the worker
+                    }
+                    worker.ready.signal();            // Signal the worker that a task is ready
+                    taskAssigned = true;              // Task has been assigned
+                    break;                             // Exit the loop once a task is assigned
                 }
+            }
+            if (!taskAssigned) {
+                this_thread::yield();                 // Yield if no workers are available
             }
         }
     }
@@ -74,49 +74,60 @@ void ThreadPool::worker(int id) {
     worker_t& worker = wts[id];                      // Get the worker by ID
 
     while (true) {
-        worker.ready.wait();                         // Wait for a task to be ready
-
-        if (done && !worker.hasTask) break;          // If done and no task, exit the loop
+        worker.ready.wait();                          // Wait for a task to be ready
+        if (done) break;             // If done and no task, exit the loop
 
         function<void(void)> task;
-
+        
         {
-            unique_lock<mutex> lock(worker.mtx);    // Lock the worker's mutex
-            if (!worker.hasTask) continue;          // If no task, continue waiting
-            task = move(worker.thunk);              // Move the task to execute
-            worker.hasTask = false;                 // Mark the worker as not having a task
+            lock_guard<mutex> guard(worker.mtx); // Lock the worker's mutex
+            task = move(worker.thunk); // Move the task from the worker
+            worker.thunk = nullptr; // Clear the worker's task
         }
 
-        task();                                      // Execute the task
+        if (task) { // If there is a task to execute
+            task(); // Execute the task
+        }
+
+        worker.available.store(true); // Mark the worker as available for new tasks
 
         {
-            unique_lock<mutex> lock(wait_mtx);    // Lock the worker's mutex
-            activeTasks--;                        // Decrement the count of active tasks
-            if (activeTasks == 0) {               // If no active tasks left
-                wait_sem.signal();                  // Notify the wait condition
+            lock_guard<mutex> lock(wait_mtx); // Lock the wait mutex
+            activeTasks--;                      // Decrement the count of active tasks
+            if (activeTasks == 0) {
+                wait_cv.notify_all(); // Notify if all tasks are done
             }
         }
     }
 }
 
 void ThreadPool::wait() {
-    unique_lock<mutex> lock(wait_mtx);              // Lock the wait mutex
-    if (activeTasks > 0) {                          // If there are active tasks
-        wait_sem.wait();                            // Wait until all tasks are done
-    }
+    unique_lock<mutex> lock(wait_mtx); // Lock the wait mutex
+    wait_cv.wait(lock, [this]() {
+        return activeTasks == 0; // Wait until all tasks are done
+    });
 }
 
 ThreadPool::~ThreadPool() {
-    done = true;                                    // Set the done flag to true
-    dispatcher_ready.signal();                      // Notify the dispatcher to exit
+    wait(); // Wait for all tasks to complete
+
+    thp_active.store(false); // Mark the ThreadPool as inactive
     
-    for (auto& worker : wts) {
-        if (worker.ts.joinable()) {
-            worker.ts.join();                       // Join each worker thread
-        }
+    {
+        lock_guard<mutex> lock(task_mtx); // Lock the task mutex
+        done = true; // Set the done flag to true
     }
 
+    task_ready.notify_all(); // Notify the dispatcher that the pool is done
+
     if (dt.joinable()) {
-        dt.join();                                  // Join the dispatcher thread
+        dt.join(); // Join the dispatcher thread
+    }
+
+    for (auto& worker : wts) {
+        worker.ready.signal(); // Signal each worker to wake up and exit
+        if (worker.ts.joinable()) {
+            worker.ts.join(); // Join each worker thread
+        }
     }
 }
