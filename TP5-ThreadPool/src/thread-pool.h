@@ -16,7 +16,6 @@
 #include <vector>      // for vector
 #include <queue>       // for queue
 #include <mutex>       // for mutex
-#include <condition_variable> // for condition_variable
 #include "Semaphore.h" // for Semaphore
 
 using namespace std;
@@ -40,7 +39,7 @@ typedef struct worker {
     bool available = true;  // Indicates if the worker is available for new tasks
     bool hasTask = false; // Indicates if the worker has a task to execute
     mutex mtx;  // Mutex to protect access to the worker's state
-    condition_variable cv;  // Condition variable to signal when a task is ready
+    Semaphore ready = Semaphore(0); // Semaphore to signal when the worker is ready for a task
 } worker_t;
 
 class ThreadPool {
@@ -86,9 +85,9 @@ class ThreadPool {
     * *
     */
     queue<function<void(void)>> tasks;      // queue: tasks to be executed by workers
-    condition_variable dispatcher_cv;       // condition variable to signal dispatcher when tasks are available
+    Semaphore dispatcher_ready = Semaphore(0); // semaphore to signal the dispatcher when tasks are available
     mutex wait_mtx;                         // mutex to protect the wait condition
-    condition_variable wait_cv;             // condition variable to signal when all tasks are done
+    Semaphore wait_sem = Semaphore(0); // semaphore to signal when all tasks are done
     size_t activeTasks = 0;                 // counter for active tasks being processed by workers
   
     /* ThreadPools are the type of thing that shouldn't be cloneable, since it's
